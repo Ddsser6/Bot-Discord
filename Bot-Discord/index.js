@@ -14,7 +14,7 @@ const GUILD_ID = '946243184609091625';
 const CHANNEL_ID = '1387441088930910350';
 
 // Ambil Token Bot dari Environment Variable (Koyeb)
-const TOKEN = process.env.DISCORD_TOKEN;
+const TOKEN = process.env.MTUzNDExNTQ4MDc5MTY4MzEyMg.GS-Xfs.fjUCv8ygaHdaKSP9bC3hNHB6UqfZI3PK0UjDRY;
 
 function connectToVoice() {
   const guild = client.guilds.cache.get(GUILD_ID);
