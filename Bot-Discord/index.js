@@ -1,37 +1,33 @@
+const http = require('http');
 const { Client, GatewayIntentBits } = require('discord.js');
 const { joinVoiceChannel, VoiceConnectionStatus, entersState } = require('@discordjs/voice');
 
-// Inisialisasi Bot Client
+// 1. Web Server Mini untuk Menjaga Render Tetap Bangun
+http.createServer((req, res) => {
+  res.write("Bot Discord 24/7 Online!");
+  res.end();
+}).listen(process.env.PORT || 3000);
+
+// 2. Kode Bot Discord Kamu
 const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildVoiceStates
-  ]
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates]
 });
 
-// Masukkan ID Server dan ID Voice Channel kamu di sini
 const GUILD_ID = '946243184609091625';
 const CHANNEL_ID = '1387441088930910350';
-
-// Ambil Token Bot dari Environment Variable (Koyeb)
-const TOKEN = process.env.MTUzNDExNTQ4MDc5MTY4MzEyMg.GS-Xfs.fjUCv8ygaHdaKSP9bC3hNHB6UqfZI3PK0UjDRY;
+const TOKEN = process.env.MTUzNDExNTQ4MDc5MTY4MzEyMg.GD8iTC.Q9bQrHXhKJVEqiXZWX0PJLVrlZ-uGMlfC0VViY;
 
 function connectToVoice() {
   const guild = client.guilds.cache.get(GUILD_ID);
-  if (!guild) {
-    console.log('Error: Server (Guild) tidak ditemukan!');
-    return;
-  }
+  if (!guild) return;
 
-  // Bergabung ke Voice Channel
   const connection = joinVoiceChannel({
     channelId: CHANNEL_ID,
     guildId: GUILD_ID,
     adapterCreator: guild.voiceAdapterCreator,
-    selfDeaf: true // Meredam suara bot agar hemat bandwidth dan stabil 24/7
+    selfDeaf: true
   });
 
-  // Penanganan otomatis jika koneksi terputus (Auto-Reconnect)
   connection.on(VoiceConnectionStatus.Disconnected, async () => {
     try {
       await Promise.race([
@@ -39,15 +35,14 @@ function connectToVoice() {
         entersState(connection, VoiceConnectionStatus.Connecting, 5_000),
       ]);
     } catch (error) {
-      console.log('Koneksi terputus! Mencoba masuk kembali dalam 5 detik...');
       connection.destroy();
-      setTimeout(connectToVoice, 5000); // Mencoba hubungkan ulang
+      setTimeout(connectToVoice, 5000);
     }
   });
 }
 
 client.once('ready', () => {
-  console.log(`Bot berhasil aktif sebagai ${client.user.tag}`);
+  console.log(`Bot online: ${client.user.tag}`);
   connectToVoice();
 });
 
