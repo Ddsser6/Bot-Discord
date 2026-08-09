@@ -6,9 +6,7 @@ const {
   Client, GatewayIntentBits, Partials, EmbedBuilder, 
   ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, PermissionFlagsBits 
 } = require('discord.js');
-const { DisTube } = require('distube');
-const { SpotifyPlugin } = require('@distube/spotify');
-const ffmpeg = require('ffmpeg-static');
+const { joinVoiceChannel, VoiceConnectionStatus, entersState } = require('@discordjs/voice');
 
 // 1. Inisialisasi Bot Discord
 const client = new Client({
@@ -21,15 +19,6 @@ const client = new Client({
     GatewayIntentBits.GuildMessageReactions
   ],
   partials: [Partials.Message, Partials.Channel, Partials.Reaction]
-});
-
-// 2. Inisialisasi Player Musik DisTube
-const distube = new DisTube(client, {
-  emitNewSongOnly: true,
-  ffmpeg: {
-    path: ffmpeg
-  },
-  plugins: [new SpotifyPlugin()]
 });
 
 const PREFIX = '!';
@@ -46,26 +35,6 @@ const BAD_WORDS = ['anjing', 'babi', 'kontol', 'memek', 'goblok'];
 
 client.once('ready', () => {
   console.log(`Bot Super Lengkap Aktif sebagai: ${client.user.tag}`);
-});
-
-// --- EVENT MUSIK (DISTUBE) ---
-distube.on('playSong', (queue, song) => {
-  queue.textChannel?.send(`🎶 Sedang memutar: **${song.name}** - \`${song.formattedDuration}\``);
-});
-
-distube.on('addSong', (queue, song) => {
-  queue.textChannel?.send(`✅ Ditambahkan ke antrean: **${song.name}**`);
-});
-
-distube.on('addList', (queue, playlist) => {
-  queue.textChannel?.send(`📜 Playlist **${playlist.name}** (${playlist.songs.length} lagu) berhasil ditambahkan ke antrean!`);
-});
-
-distube.on('error', (channel, e) => {
-  console.error('DisTube Error:', e);
-  if (channel && typeof channel.send === 'function') {
-    channel.send(`❌ Gagal memutar musik: \`${e.message ? e.message.slice(0, 100) : 'Error tidak diketahui'}\``);
-  }
 });
 
 // Penanganan Uncaught Error
@@ -101,8 +70,37 @@ client.on('messageCreate', async (message) => {
   const args = message.content.slice(PREFIX.length).trim().split(/ +/);
   const command = args.shift().toLowerCase();
 
+  // FITUR VOICE 24/7 (JOIN & LEAVE)
+  if (command === 'join' || command === 'j') {
+    const voiceChannel = message.member.voice.channel;
+    if (!voiceChannel) return message.reply('❌ Kamu harus bergabung ke Voice Channel terlebih dahulu!');
+
+    try {
+      joinVoiceChannel({
+        channelId: voiceChannel.id,
+        guildId: message.guild.id,
+        adapterCreator: message.guild.voiceAdapterCreator,
+        selfDeaf: true,  // Bot otomatis deafen agar hemat bandwidth
+        selfMute: false
+      });
+      message.reply(`✅ Bot berhasil bergabung ke **${voiceChannel.name}** dan akan tetap di sana 24/7!`);
+    } catch (err) {
+      console.error(err);
+      message.reply(`❌ Gagal masuk voice channel: \`${err.message}\``);
+    }
+  }
+
+  else if (command === 'leave' || command === 'l') {
+    const { getVoiceConnection } = require('@discordjs/voice');
+    const connection = getVoiceConnection(message.guild.id);
+    if (!connection) return message.reply('❌ Bot tidak sedang berada di Voice Channel!');
+
+    connection.destroy();
+    message.reply('👋 Bot telah keluar dari Voice Channel.');
+  }
+
   // FITUR 3: AI CHAT (Gemini 2.5 Flash)
-  if (command === 'plaza') {
+  else if (command === 'plaza') {
     const prompt = args.join(' ');
     if (!prompt) return message.reply('Masukkan pertanyaan! Contoh: `!PLAZA siapa presiden indonesia sekarang`');
 
@@ -156,54 +154,7 @@ client.on('messageCreate', async (message) => {
     }
   }
 
-  // FITUR 4: PEMUTAR MUSIK
-  else if (command === 'play' || command === 'p') {
-    const query = args.join(' ');
-    if (!query) return message.reply('Masukkan judul lagu, link YouTube, atau link Spotify!');
-    const voiceChannel = message.member.voice.channel;
-    if (!voiceChannel) return message.reply('❌ Kamu harus bergabung ke channel Voice terlebih dahulu!');
-
-    try {
-      await distube.play(voiceChannel, query, {
-        textChannel: message.channel,
-        member: message.member
-      });
-    } catch (e) {
-      message.reply(`❌ Gagal memutar lagu: ${e.message}`);
-    }
-  }
-
-  else if (command === 'skip' || command === 's') {
-    if (!message.member.voice.channel) return message.reply('❌ Kamu harus di channel Voice!');
-    try {
-      await distube.skip(message);
-      message.reply('⏭️ Lagu dilewati!');
-    } catch {
-      message.reply('❌ Tidak ada lagu berikutnya.');
-    }
-  }
-
-  else if (command === 'stop') {
-    if (!message.member.voice.channel) return message.reply('❌ Kamu harus di channel Voice!');
-    try {
-      await distube.stop(message);
-      message.reply('⏹️ Musik dihentikan dan antrean dibersihkan.');
-    } catch {
-      message.reply('❌ Musik tidak sedang diputar.');
-    }
-  }
-
-  else if (command === 'queue' || command === 'q') {
-    const queue = distube.getQueue(message);
-    if (!queue) return message.reply('❌ Tidak ada musik yang sedang diputar.');
-    const qList = queue.songs
-      .map((song, i) => `${i === 0 ? '▶️ **Sedang Diputar:**' : `**${i}.**`} ${song.name} - \`${song.formattedDuration}\``)
-      .slice(0, 10)
-      .join('\n');
-    message.reply(`📜 **Antrean Musik:**\n${qList}`);
-  }
-
-  // FITUR 5: EKONOMI
+  // FITUR 4: EKONOMI
   else if (command === 'daily') {
     db.economy[userId] += 250;
     message.reply('🪙 Kamu menerima hadiah harian **250 Koin**!');
@@ -227,13 +178,13 @@ client.on('messageCreate', async (message) => {
     }
   }
 
-  // FITUR 6: LEVEL & STATISTIK
+  // FITUR 5: LEVEL & STATISTIK
   else if (command === 'rank') {
     const lvlData = db.levels[userId];
     message.reply(`📊 **Profil Status:**\n• Level: **${lvlData.level}**\n• XP: **${lvlData.xp} / ${lvlData.level * 100}**`);
   }
 
-  // FITUR 7: UTILITY
+  // FITUR 6: UTILITY
   else if (command === 'serverinfo') {
     const embed = new EmbedBuilder()
       .setTitle(`🏰 Info Server: ${message.guild.name}`)
@@ -245,7 +196,7 @@ client.on('messageCreate', async (message) => {
     message.channel.send({ embeds: [embed] });
   }
 
-  // FITUR 8: MODERASI
+  // FITUR 7: MODERASI
   else if (command === 'clear') {
     if (!message.member.permissions.has(PermissionFlagsBits.ManageMessages)) return message.reply('Kamu tidak punya izin!');
     const amount = parseInt(args[0]);
@@ -254,7 +205,7 @@ client.on('messageCreate', async (message) => {
     message.channel.send(`🧹 Berhasil menghapus ${amount} pesan!`).then(m => setTimeout(() => m.delete(), 3000));
   }
 
-  // FITUR 9: TIKET SUPPORT
+  // FITUR 8: TIKET SUPPORT
   else if (command === 'setupticket') {
     if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) return;
     const embed = new EmbedBuilder()
