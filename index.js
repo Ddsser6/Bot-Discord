@@ -1,3 +1,7 @@
+// Polyfill untuk kompatibilitas buffer & fetch pada Node.js
+const { File } = require('buffer');
+if (!globalThis.File) globalThis.File = File;
+
 const { 
   Client, GatewayIntentBits, Partials, EmbedBuilder, 
   ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, PermissionFlagsBits 
@@ -5,7 +9,7 @@ const {
 const { joinVoiceChannel } = require('@discordjs/voice');
 const { DisTube } = require('distube');
 
-// 1. Inisialisasi Bot Discord
+// Inisialisasi Bot Discord
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -18,7 +22,7 @@ const client = new Client({
   partials: [Partials.Message, Partials.Channel, Partials.Reaction]
 });
 
-// 2. Inisialisasi Player Musik (DisTube)
+// Inisialisasi Player Musik (DisTube)
 const distube = new DisTube(client, {
   emitNewSongOnly: true,
   leaveOnEmpty: false,
@@ -78,14 +82,14 @@ client.on('messageCreate', async (message) => {
 
   const userId = message.author.id;
 
-  // FITUR 1: AUTOMOD (Filter Kata Kotor)
+  // FITUR 1: AUTOMOD
   const containsBadWord = BAD_WORDS.some(word => message.content.toLowerCase().includes(word));
   if (containsBadWord) {
     await message.delete();
     return message.channel.send(`<@${userId}>, tolong jaga katamu! (Pesan dihapus)`).then(m => setTimeout(() => m.delete(), 4000));
   }
 
-  // FITUR 2: LEVELING (Sistem XP Otomatis)
+  // FITUR 2: LEVELING
   if (!db.levels[userId]) db.levels[userId] = { xp: 0, level: 1 };
   db.levels[userId].xp += Math.floor(Math.random() * 10) + 5;
   const nextLevelXp = db.levels[userId].level * 100;
@@ -94,7 +98,6 @@ client.on('messageCreate', async (message) => {
     message.channel.send(`🎉 Selamat <@${userId}>, kamu naik ke **Level ${db.levels[userId].level}**!`);
   }
 
-  // Inisialisasi Saldo Ekonomi
   if (!db.economy[userId]) db.economy[userId] = 100;
 
   if (!message.content.startsWith(PREFIX)) return;
@@ -203,7 +206,7 @@ client.on('messageCreate', async (message) => {
     message.reply(`📜 **Antrean Musik:**\n${qList}`);
   }
 
-  // FITUR 5: EKONOMI & MINI-GAMES
+  // FITUR 5: EKONOMI
   else if (command === 'daily') {
     db.economy[userId] += 250;
     message.reply('🪙 Kamu menerima hadiah harian **250 Koin**!');
@@ -245,7 +248,7 @@ client.on('messageCreate', async (message) => {
     message.channel.send({ embeds: [embed] });
   }
 
-  // FITUR 8: MODERASI ADMIN
+  // FITUR 8: MODERASI
   else if (command === 'clear') {
     if (!message.member.permissions.has(PermissionFlagsBits.ManageMessages)) return message.reply('Kamu tidak punya izin!');
     const amount = parseInt(args[0]);
@@ -254,7 +257,7 @@ client.on('messageCreate', async (message) => {
     message.channel.send(`🧹 Berhasil menghapus ${amount} pesan!`).then(m => setTimeout(() => m.delete(), 3000));
   }
 
-  // FITUR 9: SETUP TIKET SUPPORT
+  // FITUR 9: TIKET SUPPORT
   else if (command === 'setupticket') {
     if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) return;
     const embed = new EmbedBuilder()
@@ -270,7 +273,7 @@ client.on('messageCreate', async (message) => {
   }
 });
 
-// INTERAKSI TIKET PRIVAT
+// INTERAKSI TIKET
 client.on('interactionCreate', async (interaction) => {
   if (!interaction.isButton()) return;
 
