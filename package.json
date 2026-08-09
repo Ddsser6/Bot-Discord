@@ -1,7 +1,7 @@
 {
   "name": "bot-discord",
   "version": "1.0.0",
-  "description": "Discord Bot dengan Gemini AI, Music, Economy, Leveling, dan Ticket System",
+  "description": "Discord Bot dengan Gemini AI, Music (YouTube & Spotify), Economy, Leveling, dan Ticket System",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
@@ -9,7 +9,7 @@
   "engines": {
     "node": ">=20.0.0"
   },
- "dependencies": {
+  "dependencies": {
     "@discordjs/opus": "^0.9.0",
     "@discordjs/voice": "^0.18.0",
     "@distube/spotify": "^2.0.0",
