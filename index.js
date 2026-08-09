@@ -4,7 +4,7 @@ const {
 } = require('discord.js');
 const { joinVoiceChannel } = require('@discordjs/voice');
 
-// Inisialisasi Bot Discord
+// 1. Inisialisasi Bot Discord
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -56,14 +56,14 @@ client.on('messageCreate', async (message) => {
 
   const userId = message.author.id;
 
-  // FITUR 1: AUTOMOD
+  // FITUR 1: AUTOMOD (Filter Kata Kotor)
   const containsBadWord = BAD_WORDS.some(word => message.content.toLowerCase().includes(word));
   if (containsBadWord) {
     await message.delete();
     return message.channel.send(`<@${userId}>, tolong jaga katamu! (Pesan dihapus)`).then(m => setTimeout(() => m.delete(), 4000));
   }
 
-  // FITUR 2: LEVELING
+  // FITUR 2: LEVELING (Sistem XP Otomatis)
   if (!db.levels[userId]) db.levels[userId] = { xp: 0, level: 1 };
   db.levels[userId].xp += Math.floor(Math.random() * 10) + 5;
   const nextLevelXp = db.levels[userId].level * 100;
@@ -72,6 +72,7 @@ client.on('messageCreate', async (message) => {
     message.channel.send(`🎉 Selamat <@${userId}>, kamu naik ke **Level ${db.levels[userId].level}**!`);
   }
 
+  // Inisialisasi Saldo Ekonomi
   if (!db.economy[userId]) db.economy[userId] = 100;
 
   if (!message.content.startsWith(PREFIX)) return;
@@ -79,10 +80,10 @@ client.on('messageCreate', async (message) => {
   const args = message.content.slice(PREFIX.length).trim().split(/ +/);
   const command = args.shift().toLowerCase();
 
-  // FITUR 3: AI CHAT (REST API Direct Call)
+  // FITUR 3: AI CHAT (Google Search Grounding Enabled)
   if (command === 'plaza') {
     const prompt = args.join(' ');
-    if (!prompt) return message.reply('Masukkan pertanyaan! Contoh: `!tanya siapa penemu listrik`');
+    if (!prompt) return message.reply('Masukkan pertanyaan! Contoh: `!PLAZA siapa presiden indonesia sekarang`');
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) return message.reply('❌ Error: `GEMINI_API_KEY` tidak ditemukan di Railway Variables!');
@@ -106,11 +107,19 @@ client.on('messageCreate', async (message) => {
 
       contents.push({ parts });
 
-      // Memanggil Endpoint Gemini 2.5 Flash via REST API
+      // Memanggil Gemini 2.5 Flash dengan Google Search aktif
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents })
+        body: JSON.stringify({
+          contents,
+          systemInstruction: {
+            parts: [{ text: "Gunakan informasi real-time dan berita terbaru jika diperlukan. Berikan jawaban yang akurat berdasarkan fakta terkini." }]
+          },
+          tools: [
+            { googleSearch: {} } // Aktifkan Google Search Grounding
+          ]
+        })
       });
 
       const data = await response.json();
@@ -127,7 +136,7 @@ client.on('messageCreate', async (message) => {
     }
   }
 
-  // FITUR 4: EKONOMI
+  // FITUR 4: EKONOMI & MINI-GAMES
   else if (command === 'daily') {
     db.economy[userId] += 250;
     message.reply('🪙 Kamu menerima hadiah harian **250 Koin**!');
@@ -169,7 +178,7 @@ client.on('messageCreate', async (message) => {
     message.channel.send({ embeds: [embed] });
   }
 
-  // FITUR 7: MODERASI
+  // FITUR 7: MODERASI ADMIN
   else if (command === 'clear') {
     if (!message.member.permissions.has(PermissionFlagsBits.ManageMessages)) return message.reply('Kamu tidak punya izin!');
     const amount = parseInt(args[0]);
@@ -178,7 +187,7 @@ client.on('messageCreate', async (message) => {
     message.channel.send(`🧹 Berhasil menghapus ${amount} pesan!`).then(m => setTimeout(() => m.delete(), 3000));
   }
 
-  // FITUR 8: TIKET
+  // FITUR 8: SETUP TIKET SUPPORT
   else if (command === 'setupticket') {
     if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) return;
     const embed = new EmbedBuilder()
@@ -194,7 +203,7 @@ client.on('messageCreate', async (message) => {
   }
 });
 
-// INTERAKSI TIKET
+// INTERAKSI TIKET PRIVAT
 client.on('interactionCreate', async (interaction) => {
   if (!interaction.isButton()) return;
 
