@@ -23,12 +23,9 @@ const client = new Client({
   partials: [Partials.Message, Partials.Channel, Partials.Reaction]
 });
 
-// 2. Inisialisasi Player Musik (DisTube)
+// 2. Inisialisasi Player Musik (DisTube Aman & Stabil)
 const distube = new DisTube(client, {
   emitNewSongOnly: true,
-  leaveOnStop: true,
-  leaveOnEmpty: true,
-  emptyTimeout: 30,
   ffmpeg: {
     path: ffmpeg
   },
@@ -65,8 +62,19 @@ distube.on('addList', (queue, playlist) => {
 });
 
 distube.on('error', (channel, e) => {
-  if (channel) channel.send(`❌ Gagal memutar musik: \`${e.message.slice(0, 100)}\``);
-  else console.error(e);
+  console.error('DisTube Error:', e);
+  if (channel && typeof channel.send === 'function') {
+    channel.send(`❌ Gagal memutar musik: \`${e.message ? e.message.slice(0, 100) : 'Error tidak diketahui'}\``);
+  }
+});
+
+// --- PENANGANAN UNCAUGHT ERROR (Mencegah Bot Crash di Railway) ---
+process.on('unhandledRejection', error => {
+  console.error('Unhandled promise rejection:', error);
+});
+
+process.on('uncaughtException', error => {
+  console.error('Uncaught exception:', error);
 });
 
 // --- EVENT HANDLER PESAN ---
