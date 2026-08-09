@@ -5,7 +5,7 @@ const {
 const { joinVoiceChannel } = require('@discordjs/voice');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-// Inisialisasi Bot Discord dengan Intent Lengkap
+// Inisialisasi Bot Discord
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -19,14 +19,14 @@ const client = new Client({
 });
 
 // Inisialisasi AI Gemini
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY|| '');
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 // === KONFIGURASI ID ===
 const GUILD_ID = '946243184609091625';
 const VOICE_CHANNEL_ID = '1387441088930910350';
 const PREFIX = '!';
 
-// Database Lokal Sederhana
+// Database Memori Lokal
 const db = {
   economy: {},
   levels: {},
@@ -60,14 +60,14 @@ client.on('messageCreate', async (message) => {
 
   const userId = message.author.id;
 
-  // 1. AUTOMOD
+  // 1. AUTOMOD (Filter Kata Kotor)
   const containsBadWord = BAD_WORDS.some(word => message.content.toLowerCase().includes(word));
   if (containsBadWord) {
     await message.delete();
     return message.channel.send(`<@${userId}>, tolong jaga katamu! (Pesan dihapus)`).then(m => setTimeout(() => m.delete(), 4000));
   }
 
-  // 2. LEVELING
+  // 2. LEVELING (XP Otomatis)
   if (!db.levels[userId]) db.levels[userId] = { xp: 0, level: 1 };
   db.levels[userId].xp += Math.floor(Math.random() * 10) + 5;
   const nextLevelXp = db.levels[userId].level * 100;
@@ -83,7 +83,7 @@ client.on('messageCreate', async (message) => {
   const args = message.content.slice(PREFIX.length).trim().split(/ +/);
   const command = args.shift().toLowerCase();
 
-  // 3. AI CHAT & VISION
+  // 3. AI CHAT & VISION (Gemini)
   if (command === 'tanya') {
     const prompt = args.join(' ');
     if (!prompt) return message.reply('Masukkan pertanyaan! Contoh: `!tanya siapa penemu listrik`');
@@ -110,12 +110,12 @@ client.on('messageCreate', async (message) => {
       const responseText = result.response.text() || 'Tidak ada respons.';
       message.reply(responseText.length > 2000 ? responseText.slice(0, 1990) + '...' : responseText);
     } catch (err) {
-      console.error(err);
-      message.reply('Gagal memproses AI. Pastikan GEMINI_API_KEY sudah diset di Railway Variables.');
+      console.error("AI Error Detail:", err);
+      message.reply(`Gagal memproses AI. Detail Error: \`${err.message || err}\``);
     }
   }
 
-  // 4. EKONOMI
+  // 4. FITUR EKONOMI
   else if (command === 'daily') {
     db.economy[userId] += 250;
     message.reply('🪙 Kamu menerima hadiah harian **250 Koin**!');
@@ -139,13 +139,13 @@ client.on('messageCreate', async (message) => {
     }
   }
 
-  // 5. LEVEL & PROFIL
+  // 5. FITUR LEVEL & PROFIL
   else if (command === 'rank') {
     const lvlData = db.levels[userId];
     message.reply(`📊 **Profil Status:**\n• Level: **${lvlData.level}**\n• XP: **${lvlData.xp} / ${lvlData.level * 100}**`);
   }
 
-  // 6. UTILITY
+  // 6. FITUR UTILITY
   else if (command === 'serverinfo') {
     const embed = new EmbedBuilder()
       .setTitle(`🏰 Info Server: ${message.guild.name}`)
@@ -157,7 +157,7 @@ client.on('messageCreate', async (message) => {
     message.channel.send({ embeds: [embed] });
   }
 
-  // 7. MODERASI
+  // 7. FITUR MODERASI
   else if (command === 'clear') {
     if (!message.member.permissions.has(PermissionFlagsBits.ManageMessages)) return message.reply('Kamu tidak punya izin!');
     const amount = parseInt(args[0]);
@@ -166,7 +166,7 @@ client.on('messageCreate', async (message) => {
     message.channel.send(`🧹 Berhasil menghapus ${amount} pesan!`).then(m => setTimeout(() => m.delete(), 3000));
   }
 
-  // 8. TIKET
+  // 8. SETUP TIKET BANTUAN
   else if (command === 'setupticket') {
     if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) return;
     const embed = new EmbedBuilder()
@@ -182,7 +182,7 @@ client.on('messageCreate', async (message) => {
   }
 });
 
-// INTERAKSI TIKET
+// INTERAKSI TIKET PRIVAT
 client.on('interactionCreate', async (interaction) => {
   if (!interaction.isButton()) return;
 
