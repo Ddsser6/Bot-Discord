@@ -6,7 +6,6 @@ const {
   Client, GatewayIntentBits, Partials, EmbedBuilder, 
   ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, PermissionFlagsBits 
 } = require('discord.js');
-const { joinVoiceChannel } = require('@discordjs/voice');
 const { DisTube } = require('distube');
 const { SpotifyPlugin } = require('@distube/spotify');
 
@@ -23,7 +22,7 @@ const client = new Client({
   partials: [Partials.Message, Partials.Channel, Partials.Reaction]
 });
 
-// 2. Inisialisasi Player Musik (DisTube dengan Dukungan Spotify)
+// 2. Inisialisasi Player Musik (DisTube)
 const distube = new DisTube(client, {
   emitNewSongOnly: true,
   plugins: [new SpotifyPlugin()]
@@ -44,17 +43,20 @@ const db = {
 // AutoMod: Filter Kata Terlarang
 const BAD_WORDS = ['anjing', 'babi', 'kontol', 'memek', 'goblok'];
 
-// --- FUNGSI VOICE CHANNEL 24/7 ---
-function connectToVoice() {
+// --- FUNGSI VOICE CHANNEL 24/7 (LEWAT DISTUBE) ---
+async function connectToVoice() {
   const guild = client.guilds.cache.get(GUILD_ID);
   if (!guild) return;
 
-  joinVoiceChannel({
-    channelId: VOICE_CHANNEL_ID,
-    guildId: GUILD_ID,
-    adapterCreator: guild.voiceAdapterCreator,
-    selfDeaf: true
-  });
+  const channel = guild.channels.cache.get(VOICE_CHANNEL_ID);
+  if (!channel) return;
+
+  try {
+    await distube.voices.join(channel);
+    console.log(`Berhasil terhubung 24/7 ke Voice: ${channel.name}`);
+  } catch (err) {
+    console.error("Gagal terhubung ke Voice 24/7:", err.message);
+  }
 }
 
 client.once('ready', () => {
@@ -164,10 +166,10 @@ client.on('messageCreate', async (message) => {
     }
   }
 
-  // FITUR 4: PEMUTAR MUSIK (Mendukung Judul, Link YouTube, & Link Spotify)
+  // FITUR 4: PEMUTAR MUSIK
   else if (command === 'play' || command === 'p') {
     const query = args.join(' ');
-    if (!query) return message.reply('Masukkan judul lagu, link YouTube, atau link Spotify! Contoh: `!play https://open.spotify.com/track/...`');
+    if (!query) return message.reply('Masukkan judul lagu, link YouTube, atau link Spotify!');
     if (!message.member.voice.channel) return message.reply('❌ Kamu harus bergabung ke channel Voice terlebih dahulu!');
 
     try {
