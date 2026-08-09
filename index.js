@@ -80,7 +80,7 @@ client.on('messageCreate', async (message) => {
   const command = args.shift().toLowerCase();
 
   // FITUR 3: AI CHAT (REST API Direct Call)
-  if (command === 'PLAZA') {
+  if (command === 'plaza') {
     const prompt = args.join(' ');
     if (!prompt) return message.reply('Masukkan pertanyaan! Contoh: `!tanya siapa penemu listrik`');
 
