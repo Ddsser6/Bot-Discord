@@ -3,7 +3,6 @@ const {
   ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, PermissionFlagsBits 
 } = require('discord.js');
 const { joinVoiceChannel } = require('@discordjs/voice');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 // Inisialisasi Bot Discord
 const client = new Client({
@@ -57,14 +56,14 @@ client.on('messageCreate', async (message) => {
 
   const userId = message.author.id;
 
-  // FITUR 1: AUTOMOD (Filter Kata Kotor)
+  // FITUR 1: AUTOMOD
   const containsBadWord = BAD_WORDS.some(word => message.content.toLowerCase().includes(word));
   if (containsBadWord) {
     await message.delete();
     return message.channel.send(`<@${userId}>, tolong jaga katamu! (Pesan dihapus)`).then(m => setTimeout(() => m.delete(), 4000));
   }
 
-  // FITUR 2: LEVELING (Sistem XP Otomatis)
+  // FITUR 2: LEVELING
   if (!db.levels[userId]) db.levels[userId] = { xp: 0, level: 1 };
   db.levels[userId].xp += Math.floor(Math.random() * 10) + 5;
   const nextLevelXp = db.levels[userId].level * 100;
@@ -73,7 +72,6 @@ client.on('messageCreate', async (message) => {
     message.channel.send(`🎉 Selamat <@${userId}>, kamu naik ke **Level ${db.levels[userId].level}**!`);
   }
 
-  // Inisialisasi Saldo Ekonomi
   if (!db.economy[userId]) db.economy[userId] = 100;
 
   if (!message.content.startsWith(PREFIX)) return;
@@ -81,38 +79,47 @@ client.on('messageCreate', async (message) => {
   const args = message.content.slice(PREFIX.length).trim().split(/ +/);
   const command = args.shift().toLowerCase();
 
-  // FITUR 3: AI CHAT & VISION (Gemini)
+  // FITUR 3: AI CHAT (REST API Direct Call)
   if (command === 'tanya') {
     const prompt = args.join(' ');
     if (!prompt) return message.reply('Masukkan pertanyaan! Contoh: `!tanya siapa penemu listrik`');
 
     const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return message.reply('❌ Error: `GEMINI_API_KEY` tidak ditemukan di Railway Variables!');
-    }
+    if (!apiKey) return message.reply('❌ Error: `GEMINI_API_KEY` tidak ditemukan di Railway Variables!');
 
     await message.channel.sendTyping();
 
     try {
-      const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-      let result;
+      const contents = [];
+      const parts = [{ text: prompt }];
 
       if (message.attachments.size > 0) {
         const image = message.attachments.first();
         const imageBuffer = await fetch(image.url).then(res => res.arrayBuffer());
-        const imagePart = {
+        parts.push({
           inlineData: {
-            data: Buffer.from(imageBuffer).toString('base64'),
-            mimeType: image.contentType
+            mimeType: image.contentType,
+            data: Buffer.from(imageBuffer).toString('base64')
           }
-        };
-        result = await model.generateContent([prompt, imagePart]);
-      } else {
-        result = await model.generateContent(prompt);
+        });
       }
 
-      const responseText = result.response.text() || 'Tidak ada respons dari AI.';
+      contents.push({ parts });
+
+      // Memanggil Endpoint Gemini 2.5 Flash via REST API
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents })
+      });
+
+      const data = await response.json();
+
+      if (data.error) {
+        throw new Error(data.error.message || JSON.stringify(data.error));
+      }
+
+      const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Tidak ada respons dari AI.';
       message.reply(responseText.length > 2000 ? responseText.slice(0, 1990) + '...' : responseText);
     } catch (err) {
       console.error("AI Error:", err);
@@ -120,7 +127,7 @@ client.on('messageCreate', async (message) => {
     }
   }
 
-  // FITUR 4: EKONOMI & MINI-GAMES
+  // FITUR 4: EKONOMI
   else if (command === 'daily') {
     db.economy[userId] += 250;
     message.reply('🪙 Kamu menerima hadiah harian **250 Koin**!');
@@ -150,7 +157,7 @@ client.on('messageCreate', async (message) => {
     message.reply(`📊 **Profil Status:**\n• Level: **${lvlData.level}**\n• XP: **${lvlData.xp} / ${lvlData.level * 100}**`);
   }
 
-  // FITUR 6: SERVER UTILITY
+  // FITUR 6: UTILITY
   else if (command === 'serverinfo') {
     const embed = new EmbedBuilder()
       .setTitle(`🏰 Info Server: ${message.guild.name}`)
@@ -162,7 +169,7 @@ client.on('messageCreate', async (message) => {
     message.channel.send({ embeds: [embed] });
   }
 
-  // FITUR 7: MODERASI ADMIN
+  // FITUR 7: MODERASI
   else if (command === 'clear') {
     if (!message.member.permissions.has(PermissionFlagsBits.ManageMessages)) return message.reply('Kamu tidak punya izin!');
     const amount = parseInt(args[0]);
@@ -171,7 +178,7 @@ client.on('messageCreate', async (message) => {
     message.channel.send(`🧹 Berhasil menghapus ${amount} pesan!`).then(m => setTimeout(() => m.delete(), 3000));
   }
 
-  // FITUR 8: SETUP TIKET SUPPORT
+  // FITUR 8: TIKET
   else if (command === 'setupticket') {
     if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) return;
     const embed = new EmbedBuilder()
@@ -187,7 +194,7 @@ client.on('messageCreate', async (message) => {
   }
 });
 
-// INTERAKSI TIKET PRIVAT
+// INTERAKSI TIKET
 client.on('interactionCreate', async (interaction) => {
   if (!interaction.isButton()) return;
 
