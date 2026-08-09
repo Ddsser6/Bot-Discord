@@ -61,7 +61,7 @@ client.once('ready', () => {
 });
 
 // --- EVENT MUSIK (DISTUBE) ---
-distube.on('playSong', (queue, song) => {
+distube.on('playsong', (queue, song) => {
   queue.textChannel?.send(`🎶 Sedang memutar: **${song.name}** - \`${song.formattedDuration}\``);
 });
 
