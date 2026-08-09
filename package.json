@@ -1,22 +1,20 @@
 {
   "name": "bot-discord",
   "version": "1.0.0",
-  "description": "Discord Bot dengan Gemini AI, Music (YouTube & Spotify), Economy, Leveling, dan Ticket System",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
-  "engines": {
-    "node": ">=20.0.0"
-  },
   "dependencies": {
     "@discordjs/opus": "^0.9.0",
-    "@discordjs/voice": "^0.18.0",
+    "@discordjs/voice": "^0.16.1",
     "@distube/spotify": "^2.0.0",
-    "@distube/ytdl-core": "^4.16.10",
-    "discord.js": "^14.18.0",
-    "distube": "^5.0.4",
+    "buffer": "^6.0.3",
+    "discord.js": "^14.14.1",
+    "distube": "^5.0.0",
     "ffmpeg-static": "^5.2.0",
-    "sodium-native": "^4.1.1"
+    "libsodium-wrappers": "^0.7.13",
+    "prism-media": "^1.3.5",
+    "tweetnacl": "^1.0.3"
   }
 }
