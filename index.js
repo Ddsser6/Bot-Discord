@@ -22,11 +22,9 @@ const client = new Client({
   partials: [Partials.Message, Partials.Channel, Partials.Reaction]
 });
 
-// Inisialisasi Player Musik (DisTube)
+// Inisialisasi Player Musik (DisTube v5)
 const distube = new DisTube(client, {
-  emitNewSongOnly: true,
-  leaveOnEmpty: false,
-  leaveOnStop: false
+  emitNewSongOnly: true
 });
 
 // === KONFIGURASI ID SERVER & VOICE ===
