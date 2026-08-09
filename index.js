@@ -32,9 +32,6 @@ const distube = new DisTube(client, {
   plugins: [new SpotifyPlugin()]
 });
 
-// === KONFIGURASI ID SERVER & VOICE ===
-const GUILD_ID = '946243184609091625';
-const VOICE_CHANNEL_ID = '1387441088930910350';
 const PREFIX = '!';
 
 // Database Memori Lokal
@@ -47,25 +44,8 @@ const db = {
 // AutoMod: Filter Kata Terlarang
 const BAD_WORDS = ['anjing', 'babi', 'kontol', 'memek', 'goblok'];
 
-// --- FUNGSI VOICE CHANNEL 24/7 (LEWAT DISTUBE) ---
-async function connectToVoice() {
-  const guild = client.guilds.cache.get(GUILD_ID);
-  if (!guild) return;
-
-  const channel = guild.channels.cache.get(VOICE_CHANNEL_ID);
-  if (!channel) return;
-
-  try {
-    await distube.voices.join(channel);
-    console.log(`Berhasil terhubung 24/7 ke Voice: ${channel.name}`);
-  } catch (err) {
-    console.error("Gagal terhubung ke Voice 24/7:", err.message);
-  }
-}
-
 client.once('ready', () => {
   console.log(`Bot Super Lengkap Aktif sebagai: ${client.user.tag}`);
-  connectToVoice();
 });
 
 // --- EVENT MUSIK (DISTUBE) ---
