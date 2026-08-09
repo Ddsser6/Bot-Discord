@@ -3,6 +3,7 @@ const {
   ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, PermissionFlagsBits 
 } = require('discord.js');
 const { joinVoiceChannel } = require('@discordjs/voice');
+const { DisTube } = require('distube');
 
 // 1. Inisialisasi Bot Discord
 const client = new Client({
@@ -15,6 +16,13 @@ const client = new Client({
     GatewayIntentBits.GuildMessageReactions
   ],
   partials: [Partials.Message, Partials.Channel, Partials.Reaction]
+});
+
+// 2. Inisialisasi Player Musik (DisTube)
+const distube = new DisTube(client, {
+  emitNewSongOnly: true,
+  leaveOnEmpty: false,
+  leaveOnStop: false
 });
 
 // === KONFIGURASI ID SERVER & VOICE ===
@@ -50,6 +58,20 @@ client.once('ready', () => {
   connectToVoice();
 });
 
+// --- EVENT MUSIK (DISTUBE) ---
+distube.on('playSong', (queue, song) => {
+  queue.textChannel?.send(`🎶 Sedang memutar: **${song.name}** - \`${song.formattedDuration}\``);
+});
+
+distube.on('addSong', (queue, song) => {
+  queue.textChannel?.send(`✅ Ditambahkan ke antrean: **${song.name}**`);
+});
+
+distube.on('error', (channel, e) => {
+  if (channel) channel.send(`❌ Gagal memutar musik: \`${e.message.slice(0, 100)}\``);
+  else console.error(e);
+});
+
 // --- EVENT HANDLER PESAN ---
 client.on('messageCreate', async (message) => {
   if (message.author.bot || !message.guild) return;
@@ -80,7 +102,7 @@ client.on('messageCreate', async (message) => {
   const args = message.content.slice(PREFIX.length).trim().split(/ +/);
   const command = args.shift().toLowerCase();
 
-  // FITUR 3: AI CHAT (Google Search Grounding Enabled)
+  // FITUR 3: AI CHAT (Gemini 2.5 Flash + Google Search Grounding)
   if (command === 'plaza') {
     const prompt = args.join(' ');
     if (!prompt) return message.reply('Masukkan pertanyaan! Contoh: `!PLAZA siapa presiden indonesia sekarang`');
@@ -107,7 +129,6 @@ client.on('messageCreate', async (message) => {
 
       contents.push({ parts });
 
-      // Memanggil Gemini 2.5 Flash dengan Google Search aktif
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -117,7 +138,7 @@ client.on('messageCreate', async (message) => {
             parts: [{ text: "Gunakan informasi real-time dan berita terbaru jika diperlukan. Berikan jawaban yang akurat berdasarkan fakta terkini." }]
           },
           tools: [
-            { googleSearch: {} } // Aktifkan Google Search Grounding
+            { googleSearch: {} }
           ]
         })
       });
@@ -136,7 +157,53 @@ client.on('messageCreate', async (message) => {
     }
   }
 
-  // FITUR 4: EKONOMI & MINI-GAMES
+  // FITUR 4: PEMUTAR MUSIK
+  else if (command === 'play' || command === 'p') {
+    const query = args.join(' ');
+    if (!query) return message.reply('Masukkan judul lagu atau link YouTube! Contoh: `!play DJ Terbaru`');
+    if (!message.member.voice.channel) return message.reply('❌ Kamu harus bergabung ke channel Voice terlebih dahulu!');
+
+    try {
+      await distube.play(message.member.voice.channel, query, {
+        textChannel: message.channel,
+        member: message.member
+      });
+    } catch (e) {
+      message.reply(`❌ Gagal memutar lagu: ${e.message}`);
+    }
+  }
+
+  else if (command === 'skip' || command === 's') {
+    if (!message.member.voice.channel) return message.reply('❌ Kamu harus di channel Voice!');
+    try {
+      await distube.skip(message);
+      message.reply('⏭️ Lagu dilewati!');
+    } catch {
+      message.reply('❌ Tidak ada lagu berikutnya.');
+    }
+  }
+
+  else if (command === 'stop') {
+    if (!message.member.voice.channel) return message.reply('❌ Kamu harus di channel Voice!');
+    try {
+      await distube.stop(message);
+      message.reply('⏹️ Musik dihentikan dan antrean dibersihkan.');
+    } catch {
+      message.reply('❌ Musik tidak sedang diputar.');
+    }
+  }
+
+  else if (command === 'queue' || command === 'q') {
+    const queue = distube.getQueue(message);
+    if (!queue) return message.reply('❌ Tidak ada musik yang sedang diputar.');
+    const qList = queue.songs
+      .map((song, i) => `${i === 0 ? '▶️ **Sedang Diputar:**' : `**${i}.**`} ${song.name} - \`${song.formattedDuration}\``)
+      .slice(0, 10)
+      .join('\n');
+    message.reply(`📜 **Antrean Musik:**\n${qList}`);
+  }
+
+  // FITUR 5: EKONOMI & MINI-GAMES
   else if (command === 'daily') {
     db.economy[userId] += 250;
     message.reply('🪙 Kamu menerima hadiah harian **250 Koin**!');
@@ -160,13 +227,13 @@ client.on('messageCreate', async (message) => {
     }
   }
 
-  // FITUR 5: LEVEL & STATISTIK
+  // FITUR 6: LEVEL & STATISTIK
   else if (command === 'rank') {
     const lvlData = db.levels[userId];
     message.reply(`📊 **Profil Status:**\n• Level: **${lvlData.level}**\n• XP: **${lvlData.xp} / ${lvlData.level * 100}**`);
   }
 
-  // FITUR 6: UTILITY
+  // FITUR 7: UTILITY
   else if (command === 'serverinfo') {
     const embed = new EmbedBuilder()
       .setTitle(`🏰 Info Server: ${message.guild.name}`)
@@ -178,7 +245,7 @@ client.on('messageCreate', async (message) => {
     message.channel.send({ embeds: [embed] });
   }
 
-  // FITUR 7: MODERASI ADMIN
+  // FITUR 8: MODERASI ADMIN
   else if (command === 'clear') {
     if (!message.member.permissions.has(PermissionFlagsBits.ManageMessages)) return message.reply('Kamu tidak punya izin!');
     const amount = parseInt(args[0]);
@@ -187,7 +254,7 @@ client.on('messageCreate', async (message) => {
     message.channel.send(`🧹 Berhasil menghapus ${amount} pesan!`).then(m => setTimeout(() => m.delete(), 3000));
   }
 
-  // FITUR 8: SETUP TIKET SUPPORT
+  // FITUR 9: SETUP TIKET SUPPORT
   else if (command === 'setupticket') {
     if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) return;
     const embed = new EmbedBuilder()
