@@ -5,7 +5,7 @@ const {
 const { joinVoiceChannel } = require('@discordjs/voice');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-// 1. Inisialisasi Bot Discord
+// Inisialisasi Bot Discord
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -17,9 +17,6 @@ const client = new Client({
   ],
   partials: [Partials.Message, Partials.Channel, Partials.Reaction]
 });
-
-// 2. Inisialisasi AI Gemini
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 // === KONFIGURASI ID SERVER & VOICE ===
 const GUILD_ID = '946243184609091625';
@@ -84,47 +81,42 @@ client.on('messageCreate', async (message) => {
   const args = message.content.slice(PREFIX.length).trim().split(/ +/);
   const command = args.shift().toLowerCase();
 
-  // FITUR 3: AI CHAT & VISION (Sistem Auto-Fallback Anti-404)
+  // FITUR 3: AI CHAT & VISION (Gemini)
   if (command === 'tanya') {
     const prompt = args.join(' ');
     if (!prompt) return message.reply('Masukkan pertanyaan! Contoh: `!tanya siapa penemu listrik`');
 
-    await message.channel.sendTyping();
-
-    // Daftar nama model alternatif jika salah satu tidak tersedia
-    const availableModels = ['gemini-1.5-flash-latest', 'gemini-1.5-pro-latest', 'gemini-2.0-flash'];
-    let success = false;
-
-    for (const modelName of availableModels) {
-      try {
-        const model = genAI.getGenerativeModel({ model: modelName });
-        let result;
-
-        if (message.attachments.size > 0) {
-          const image = message.attachments.first();
-          const imageBuffer = await fetch(image.url).then(res => res.arrayBuffer());
-          const imagePart = {
-            inlineData: {
-              data: Buffer.from(imageBuffer).toString('base64'),
-              mimeType: image.contentType
-            }
-          };
-          result = await model.generateContent([prompt, imagePart]);
-        } else {
-          result = await model.generateContent(prompt);
-        }
-
-        const responseText = result.response.text() || 'Tidak ada respons dari AI.';
-        message.reply(responseText.length > 2000 ? responseText.slice(0, 1990) + '...' : responseText);
-        success = true;
-        break; // Keluar dari loop jika berhasil
-      } catch (err) {
-        console.log(`Model ${modelName} gagal, mencoba model berikutnya...`);
-      }
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return message.reply('❌ Error: `GEMINI_API_KEY` tidak ditemukan di Railway Variables!');
     }
 
-    if (!success) {
-      message.reply('Gagal menghubungkan ke AI. Pastikan `GEMINI_API_KEY` di Railway Variables sudah benar.');
+    await message.channel.sendTyping();
+
+    try {
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      let result;
+
+      if (message.attachments.size > 0) {
+        const image = message.attachments.first();
+        const imageBuffer = await fetch(image.url).then(res => res.arrayBuffer());
+        const imagePart = {
+          inlineData: {
+            data: Buffer.from(imageBuffer).toString('base64'),
+            mimeType: image.contentType
+          }
+        };
+        result = await model.generateContent([prompt, imagePart]);
+      } else {
+        result = await model.generateContent(prompt);
+      }
+
+      const responseText = result.response.text() || 'Tidak ada respons dari AI.';
+      message.reply(responseText.length > 2000 ? responseText.slice(0, 1990) + '...' : responseText);
+    } catch (err) {
+      console.error("AI Error:", err);
+      message.reply(`❌ AI Error: \`${err.message || err}\``);
     }
   }
 
