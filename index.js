@@ -8,6 +8,7 @@ const {
 } = require('discord.js');
 const { DisTube } = require('distube');
 const { SpotifyPlugin } = require('@distube/spotify');
+const ffmpeg = require('ffmpeg-static');
 
 // 1. Inisialisasi Bot Discord
 const client = new Client({
@@ -22,9 +23,12 @@ const client = new Client({
   partials: [Partials.Message, Partials.Channel, Partials.Reaction]
 });
 
-// 2. Inisialisasi Player Musik (DisTube)
+// 2. Inisialisasi Player Musik (DisTube + FFmpeg Path + Spotify)
 const distube = new DisTube(client, {
   emitNewSongOnly: true,
+  ffmpeg: {
+    path: ffmpeg
+  },
   plugins: [new SpotifyPlugin()]
 });
 
