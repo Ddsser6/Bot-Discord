@@ -8,7 +8,6 @@ const {
 } = require('discord.js');
 const { DisTube } = require('distube');
 const { SpotifyPlugin } = require('@distube/spotify');
-const { joinVoiceChannel } = require('@discordjs/voice');
 const ffmpeg = require('ffmpeg-static');
 
 // 1. Inisialisasi Bot Discord
@@ -69,7 +68,7 @@ distube.on('error', (channel, e) => {
   }
 });
 
-// Penanganan Uncaught Error agar bot tidak mati
+// Penanganan Uncaught Error
 process.on('unhandledRejection', error => console.error('Unhandled Promise Rejection:', error));
 process.on('uncaughtException', error => console.error('Uncaught Exception:', error));
 
@@ -157,7 +156,7 @@ client.on('messageCreate', async (message) => {
     }
   }
 
-  // FITUR 4: PEMUTAR MUSIK (DENGAN MANUAL VOICE HANDSHAKE)
+  // FITUR 4: PEMUTAR MUSIK
   else if (command === 'play' || command === 'p') {
     const query = args.join(' ');
     if (!query) return message.reply('Masukkan judul lagu, link YouTube, atau link Spotify!');
@@ -165,13 +164,6 @@ client.on('messageCreate', async (message) => {
     if (!voiceChannel) return message.reply('❌ Kamu harus bergabung ke channel Voice terlebih dahulu!');
 
     try {
-      // Paksa koneksi awal agar tidak timeout di Railway
-      joinVoiceChannel({
-        channelId: voiceChannel.id,
-        guildId: message.guild.id,
-        adapterCreator: message.guild.voiceAdapterCreator,
-      });
-
       await distube.play(voiceChannel, query, {
         textChannel: message.channel,
         member: message.member
