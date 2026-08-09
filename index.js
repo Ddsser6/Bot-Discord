@@ -8,8 +8,9 @@ const {
 } = require('discord.js');
 const { joinVoiceChannel } = require('@discordjs/voice');
 const { DisTube } = require('distube');
+const { SpotifyPlugin } = require('@distube/spotify');
 
-// Inisialisasi Bot Discord
+// 1. Inisialisasi Bot Discord
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -22,9 +23,10 @@ const client = new Client({
   partials: [Partials.Message, Partials.Channel, Partials.Reaction]
 });
 
-// Inisialisasi Player Musik (DisTube v5)
+// 2. Inisialisasi Player Musik (DisTube dengan Dukungan Spotify)
 const distube = new DisTube(client, {
-  emitNewSongOnly: true
+  emitNewSongOnly: true,
+  plugins: [new SpotifyPlugin()]
 });
 
 // === KONFIGURASI ID SERVER & VOICE ===
@@ -67,6 +69,10 @@ distube.on('playSong', (queue, song) => {
 
 distube.on('addSong', (queue, song) => {
   queue.textChannel?.send(`✅ Ditambahkan ke antrean: **${song.name}**`);
+});
+
+distube.on('addList', (queue, playlist) => {
+  queue.textChannel?.send(`📜 Playlist **${playlist.name}** (${playlist.songs.length} lagu) berhasil ditambahkan ke antrean!`);
 });
 
 distube.on('error', (channel, e) => {
@@ -158,10 +164,10 @@ client.on('messageCreate', async (message) => {
     }
   }
 
-  // FITUR 4: PEMUTAR MUSIK
+  // FITUR 4: PEMUTAR MUSIK (Mendukung Judul, Link YouTube, & Link Spotify)
   else if (command === 'play' || command === 'p') {
     const query = args.join(' ');
-    if (!query) return message.reply('Masukkan judul lagu atau link YouTube! Contoh: `!play DJ Terbaru`');
+    if (!query) return message.reply('Masukkan judul lagu, link YouTube, atau link Spotify! Contoh: `!play https://open.spotify.com/track/...`');
     if (!message.member.voice.channel) return message.reply('❌ Kamu harus bergabung ke channel Voice terlebih dahulu!');
 
     try {
