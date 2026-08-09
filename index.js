@@ -5,7 +5,7 @@ const {
 const { joinVoiceChannel } = require('@discordjs/voice');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-// Inisialisasi Bot Discord
+// 1. Inisialisasi Bot Discord
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -18,10 +18,10 @@ const client = new Client({
   partials: [Partials.Message, Partials.Channel, Partials.Reaction]
 });
 
-// Inisialisasi AI Gemini
+// 2. Inisialisasi AI Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
-// === KONFIGURASI ID ===
+// === KONFIGURASI ID SERVER & VOICE ===
 const GUILD_ID = '946243184609091625';
 const VOICE_CHANNEL_ID = '1387441088930910350';
 const PREFIX = '!';
@@ -33,10 +33,10 @@ const db = {
   tickets: 0
 };
 
-// Kata-kata Terlarang (AutoMod)
+// AutoMod: Filter Kata Terlarang
 const BAD_WORDS = ['anjing', 'babi', 'kontol', 'memek', 'goblok'];
 
-// --- FUNGSI VOICE 24/7 ---
+// --- FUNGSI VOICE CHANNEL 24/7 ---
 function connectToVoice() {
   const guild = client.guilds.cache.get(GUILD_ID);
   if (!guild) return;
@@ -60,14 +60,14 @@ client.on('messageCreate', async (message) => {
 
   const userId = message.author.id;
 
-  // 1. AUTOMOD (Filter Kata Kotor)
+  // FITUR 1: AUTOMOD (Filter Kata Kotor)
   const containsBadWord = BAD_WORDS.some(word => message.content.toLowerCase().includes(word));
   if (containsBadWord) {
     await message.delete();
     return message.channel.send(`<@${userId}>, tolong jaga katamu! (Pesan dihapus)`).then(m => setTimeout(() => m.delete(), 4000));
   }
 
-  // 2. LEVELING (XP Otomatis)
+  // FITUR 2: LEVELING (Sistem XP Otomatis)
   if (!db.levels[userId]) db.levels[userId] = { xp: 0, level: 1 };
   db.levels[userId].xp += Math.floor(Math.random() * 10) + 5;
   const nextLevelXp = db.levels[userId].level * 100;
@@ -76,6 +76,7 @@ client.on('messageCreate', async (message) => {
     message.channel.send(`🎉 Selamat <@${userId}>, kamu naik ke **Level ${db.levels[userId].level}**!`);
   }
 
+  // Inisialisasi Saldo Ekonomi
   if (!db.economy[userId]) db.economy[userId] = 100;
 
   if (!message.content.startsWith(PREFIX)) return;
@@ -83,39 +84,51 @@ client.on('messageCreate', async (message) => {
   const args = message.content.slice(PREFIX.length).trim().split(/ +/);
   const command = args.shift().toLowerCase();
 
-  // 3. AI CHAT & VISION (Gemini)
+  // FITUR 3: AI CHAT & VISION (Sistem Auto-Fallback Anti-404)
   if (command === 'tanya') {
     const prompt = args.join(' ');
     if (!prompt) return message.reply('Masukkan pertanyaan! Contoh: `!tanya siapa penemu listrik`');
 
     await message.channel.sendTyping();
-    try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-      let result;
 
-      if (message.attachments.size > 0) {
-        const image = message.attachments.first();
-        const imageBuffer = await fetch(image.url).then(res => res.arrayBuffer());
-        const imagePart = {
-          inlineData: {
-            data: Buffer.from(imageBuffer).toString('base64'),
-            mimeType: image.contentType
-          }
-        };
-        result = await model.generateContent([prompt, imagePart]);
-      } else {
-        result = await model.generateContent(prompt);
+    // Daftar nama model alternatif jika salah satu tidak tersedia
+    const availableModels = ['gemini-1.5-flash-latest', 'gemini-1.5-pro-latest', 'gemini-2.0-flash'];
+    let success = false;
+
+    for (const modelName of availableModels) {
+      try {
+        const model = genAI.getGenerativeModel({ model: modelName });
+        let result;
+
+        if (message.attachments.size > 0) {
+          const image = message.attachments.first();
+          const imageBuffer = await fetch(image.url).then(res => res.arrayBuffer());
+          const imagePart = {
+            inlineData: {
+              data: Buffer.from(imageBuffer).toString('base64'),
+              mimeType: image.contentType
+            }
+          };
+          result = await model.generateContent([prompt, imagePart]);
+        } else {
+          result = await model.generateContent(prompt);
+        }
+
+        const responseText = result.response.text() || 'Tidak ada respons dari AI.';
+        message.reply(responseText.length > 2000 ? responseText.slice(0, 1990) + '...' : responseText);
+        success = true;
+        break; // Keluar dari loop jika berhasil
+      } catch (err) {
+        console.log(`Model ${modelName} gagal, mencoba model berikutnya...`);
       }
+    }
 
-      const responseText = result.response.text() || 'Tidak ada respons.';
-      message.reply(responseText.length > 2000 ? responseText.slice(0, 1990) + '...' : responseText);
-    } catch (err) {
-      console.error("AI Error Detail:", err);
-      message.reply(`Gagal memproses AI. Detail Error: \`${err.message || err}\``);
+    if (!success) {
+      message.reply('Gagal menghubungkan ke AI. Pastikan `GEMINI_API_KEY` di Railway Variables sudah benar.');
     }
   }
 
-  // 4. FITUR EKONOMI
+  // FITUR 4: EKONOMI & MINI-GAMES
   else if (command === 'daily') {
     db.economy[userId] += 250;
     message.reply('🪙 Kamu menerima hadiah harian **250 Koin**!');
@@ -139,13 +152,13 @@ client.on('messageCreate', async (message) => {
     }
   }
 
-  // 5. FITUR LEVEL & PROFIL
+  // FITUR 5: LEVEL & STATISTIK
   else if (command === 'rank') {
     const lvlData = db.levels[userId];
     message.reply(`📊 **Profil Status:**\n• Level: **${lvlData.level}**\n• XP: **${lvlData.xp} / ${lvlData.level * 100}**`);
   }
 
-  // 6. FITUR UTILITY
+  // FITUR 6: SERVER UTILITY
   else if (command === 'serverinfo') {
     const embed = new EmbedBuilder()
       .setTitle(`🏰 Info Server: ${message.guild.name}`)
@@ -157,7 +170,7 @@ client.on('messageCreate', async (message) => {
     message.channel.send({ embeds: [embed] });
   }
 
-  // 7. FITUR MODERASI
+  // FITUR 7: MODERASI ADMIN
   else if (command === 'clear') {
     if (!message.member.permissions.has(PermissionFlagsBits.ManageMessages)) return message.reply('Kamu tidak punya izin!');
     const amount = parseInt(args[0]);
@@ -166,7 +179,7 @@ client.on('messageCreate', async (message) => {
     message.channel.send(`🧹 Berhasil menghapus ${amount} pesan!`).then(m => setTimeout(() => m.delete(), 3000));
   }
 
-  // 8. SETUP TIKET BANTUAN
+  // FITUR 8: SETUP TIKET SUPPORT
   else if (command === 'setupticket') {
     if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) return;
     const embed = new EmbedBuilder()
