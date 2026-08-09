@@ -1,8 +1,12 @@
+// Polyfill untuk kompatibilitas buffer & fetch pada Node.js
+const { File } = require('buffer');
+if (!globalThis.File) globalThis.File = File;
+
 const { 
   Client, GatewayIntentBits, Partials, EmbedBuilder, 
   ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, PermissionFlagsBits 
 } = require('discord.js');
-const { joinVoiceChannel } = require('@discordjs/voice');
+const { joinVoiceChannel, VoiceConnectionStatus, entersState } = require('@discordjs/voice');
 
 // 1. Inisialisasi Bot Discord
 const client = new Client({
@@ -32,23 +36,46 @@ const db = {
 // AutoMod: Filter Kata Terlarang
 const BAD_WORDS = ['anjing', 'babi', 'kontol', 'memek', 'goblok'];
 
-// --- FUNGSI VOICE CHANNEL 24/7 ---
+// --- FUNGSI VOICE CHANNEL 24/7 (SISTEM RECONNECT OTOMATIS) ---
 function connectToVoice() {
   const guild = client.guilds.cache.get(GUILD_ID);
-  if (!guild) return;
+  if (!guild) {
+    console.error('Guild tidak ditemukan! Periksa GUILD_ID.');
+    return;
+  }
 
-  joinVoiceChannel({
+  const connection = joinVoiceChannel({
     channelId: VOICE_CHANNEL_ID,
     guildId: GUILD_ID,
     adapterCreator: guild.voiceAdapterCreator,
     selfDeaf: true
   });
+
+  // Penanganan reconnect otomatis jika jaringan atau voice server terputus
+  connection.on(VoiceConnectionStatus.Disconnected, async () => {
+    try {
+      await Promise.race([
+        entersState(connection, VoiceConnectionStatus.Signalling, 5_000),
+        entersState(connection, VoiceConnectionStatus.Connecting, 5_000),
+      ]);
+    } catch (error) {
+      console.log('Voice terputus, mencoba menghubungkan kembali...');
+      connection.destroy();
+      setTimeout(connectToVoice, 3000); // Hubungkan ulang setelah 3 detik
+    }
+  });
+
+  console.log(`Berhasil terhubung ke Voice Channel: ${VOICE_CHANNEL_ID}`);
 }
 
 client.once('ready', () => {
   console.log(`Bot Super Lengkap Aktif sebagai: ${client.user.tag}`);
   connectToVoice();
 });
+
+// Penanganan Uncaught Error
+process.on('unhandledRejection', error => console.error('Unhandled Promise Rejection:', error));
+process.on('uncaughtException', error => console.error('Uncaught Exception:', error));
 
 // --- EVENT HANDLER PESAN ---
 client.on('messageCreate', async (message) => {
@@ -80,7 +107,7 @@ client.on('messageCreate', async (message) => {
   const args = message.content.slice(PREFIX.length).trim().split(/ +/);
   const command = args.shift().toLowerCase();
 
-  // FITUR 3: AI CHAT (Google Search Grounding Enabled)
+  // FITUR 3: AI CHAT (Gemini 2.5 Flash dengan Google Search Grounding)
   if (command === 'plaza') {
     const prompt = args.join(' ');
     if (!prompt) return message.reply('Masukkan pertanyaan! Contoh: `!PLAZA siapa presiden indonesia sekarang`');
@@ -107,7 +134,6 @@ client.on('messageCreate', async (message) => {
 
       contents.push({ parts });
 
-      // Memanggil Gemini 2.5 Flash dengan Google Search aktif
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -117,7 +143,7 @@ client.on('messageCreate', async (message) => {
             parts: [{ text: "Gunakan informasi real-time dan berita terbaru jika diperlukan. Berikan jawaban yang akurat berdasarkan fakta terkini." }]
           },
           tools: [
-            { googleSearch: {} } // Aktifkan Google Search Grounding
+            { googleSearch: {} }
           ]
         })
       });
