@@ -1,12 +1,8 @@
-// Polyfill untuk kompatibilitas buffer & fetch pada Node.js
-const { File } = require('buffer');
-if (!globalThis.File) globalThis.File = File;
-
 const { 
   Client, GatewayIntentBits, Partials, EmbedBuilder, 
   ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, PermissionFlagsBits 
 } = require('discord.js');
-const { joinVoiceChannel, VoiceConnectionStatus, entersState } = require('@discordjs/voice');
+const { joinVoiceChannel } = require('@discordjs/voice');
 
 // 1. Inisialisasi Bot Discord
 const client = new Client({
@@ -21,6 +17,9 @@ const client = new Client({
   partials: [Partials.Message, Partials.Channel, Partials.Reaction]
 });
 
+// === KONFIGURASI ID SERVER & VOICE ===
+const GUILD_ID = '946243184609091625';
+const VOICE_CHANNEL_ID = '1387441088930910350';
 const PREFIX = '!';
 
 // Database Memori Lokal
@@ -33,13 +32,23 @@ const db = {
 // AutoMod: Filter Kata Terlarang
 const BAD_WORDS = ['anjing', 'babi', 'kontol', 'memek', 'goblok'];
 
+// --- FUNGSI VOICE CHANNEL 24/7 ---
+function connectToVoice() {
+  const guild = client.guilds.cache.get(GUILD_ID);
+  if (!guild) return;
+
+  joinVoiceChannel({
+    channelId: VOICE_CHANNEL_ID,
+    guildId: GUILD_ID,
+    adapterCreator: guild.voiceAdapterCreator,
+    selfDeaf: true
+  });
+}
+
 client.once('ready', () => {
   console.log(`Bot Super Lengkap Aktif sebagai: ${client.user.tag}`);
+  connectToVoice();
 });
-
-// Penanganan Uncaught Error
-process.on('unhandledRejection', error => console.error('Unhandled Promise Rejection:', error));
-process.on('uncaughtException', error => console.error('Uncaught Exception:', error));
 
 // --- EVENT HANDLER PESAN ---
 client.on('messageCreate', async (message) => {
@@ -47,14 +56,14 @@ client.on('messageCreate', async (message) => {
 
   const userId = message.author.id;
 
-  // FITUR 1: AUTOMOD
+  // FITUR 1: AUTOMOD (Filter Kata Kotor)
   const containsBadWord = BAD_WORDS.some(word => message.content.toLowerCase().includes(word));
   if (containsBadWord) {
     await message.delete();
     return message.channel.send(`<@${userId}>, tolong jaga katamu! (Pesan dihapus)`).then(m => setTimeout(() => m.delete(), 4000));
   }
 
-  // FITUR 2: LEVELING
+  // FITUR 2: LEVELING (Sistem XP Otomatis)
   if (!db.levels[userId]) db.levels[userId] = { xp: 0, level: 1 };
   db.levels[userId].xp += Math.floor(Math.random() * 10) + 5;
   const nextLevelXp = db.levels[userId].level * 100;
@@ -63,6 +72,7 @@ client.on('messageCreate', async (message) => {
     message.channel.send(`🎉 Selamat <@${userId}>, kamu naik ke **Level ${db.levels[userId].level}**!`);
   }
 
+  // Inisialisasi Saldo Ekonomi
   if (!db.economy[userId]) db.economy[userId] = 100;
 
   if (!message.content.startsWith(PREFIX)) return;
@@ -70,37 +80,8 @@ client.on('messageCreate', async (message) => {
   const args = message.content.slice(PREFIX.length).trim().split(/ +/);
   const command = args.shift().toLowerCase();
 
-  // FITUR VOICE 24/7 (JOIN & LEAVE)
-  if (command === 'join' || command === 'j') {
-    const voiceChannel = message.member.voice.channel;
-    if (!voiceChannel) return message.reply('❌ Kamu harus bergabung ke Voice Channel terlebih dahulu!');
-
-    try {
-      joinVoiceChannel({
-        channelId: voiceChannel.id,
-        guildId: message.guild.id,
-        adapterCreator: message.guild.voiceAdapterCreator,
-        selfDeaf: true,  // Bot otomatis deafen agar hemat bandwidth
-        selfMute: false
-      });
-      message.reply(`✅ Bot berhasil bergabung ke **${voiceChannel.name}** dan akan tetap di sana 24/7!`);
-    } catch (err) {
-      console.error(err);
-      message.reply(`❌ Gagal masuk voice channel: \`${err.message}\``);
-    }
-  }
-
-  else if (command === 'leave' || command === 'l') {
-    const { getVoiceConnection } = require('@discordjs/voice');
-    const connection = getVoiceConnection(message.guild.id);
-    if (!connection) return message.reply('❌ Bot tidak sedang berada di Voice Channel!');
-
-    connection.destroy();
-    message.reply('👋 Bot telah keluar dari Voice Channel.');
-  }
-
-  // FITUR 3: AI CHAT (Gemini 2.5 Flash)
-  else if (command === 'plaza') {
+  // FITUR 3: AI CHAT (Google Search Grounding Enabled)
+  if (command === 'plaza') {
     const prompt = args.join(' ');
     if (!prompt) return message.reply('Masukkan pertanyaan! Contoh: `!PLAZA siapa presiden indonesia sekarang`');
 
@@ -126,6 +107,7 @@ client.on('messageCreate', async (message) => {
 
       contents.push({ parts });
 
+      // Memanggil Gemini 2.5 Flash dengan Google Search aktif
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -135,7 +117,7 @@ client.on('messageCreate', async (message) => {
             parts: [{ text: "Gunakan informasi real-time dan berita terbaru jika diperlukan. Berikan jawaban yang akurat berdasarkan fakta terkini." }]
           },
           tools: [
-            { googleSearch: {} }
+            { googleSearch: {} } // Aktifkan Google Search Grounding
           ]
         })
       });
@@ -154,7 +136,7 @@ client.on('messageCreate', async (message) => {
     }
   }
 
-  // FITUR 4: EKONOMI
+  // FITUR 4: EKONOMI & MINI-GAMES
   else if (command === 'daily') {
     db.economy[userId] += 250;
     message.reply('🪙 Kamu menerima hadiah harian **250 Koin**!');
@@ -196,7 +178,7 @@ client.on('messageCreate', async (message) => {
     message.channel.send({ embeds: [embed] });
   }
 
-  // FITUR 7: MODERASI
+  // FITUR 7: MODERASI ADMIN
   else if (command === 'clear') {
     if (!message.member.permissions.has(PermissionFlagsBits.ManageMessages)) return message.reply('Kamu tidak punya izin!');
     const amount = parseInt(args[0]);
@@ -205,7 +187,7 @@ client.on('messageCreate', async (message) => {
     message.channel.send(`🧹 Berhasil menghapus ${amount} pesan!`).then(m => setTimeout(() => m.delete(), 3000));
   }
 
-  // FITUR 8: TIKET SUPPORT
+  // FITUR 8: SETUP TIKET SUPPORT
   else if (command === 'setupticket') {
     if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) return;
     const embed = new EmbedBuilder()
@@ -221,7 +203,7 @@ client.on('messageCreate', async (message) => {
   }
 });
 
-// INTERAKSI TIKET
+// INTERAKSI TIKET PRIVAT
 client.on('interactionCreate', async (interaction) => {
   if (!interaction.isButton()) return;
 
