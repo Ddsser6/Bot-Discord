@@ -23,9 +23,12 @@ const client = new Client({
   partials: [Partials.Message, Partials.Channel, Partials.Reaction]
 });
 
-// 2. Inisialisasi Player Musik (DisTube + FFmpeg Path + Spotify)
+// 2. Inisialisasi Player Musik (DisTube)
 const distube = new DisTube(client, {
   emitNewSongOnly: true,
+  leaveOnStop: true,
+  leaveOnEmpty: true,
+  emptyTimeout: 30,
   ffmpeg: {
     path: ffmpeg
   },
