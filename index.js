@@ -19,7 +19,7 @@ const client = new Client({
 });
 
 // Inisialisasi AI Gemini
-const genAI = new GoogleGenerativeAI(process.env.AQ.Ab8RN6JWSIPmwMUlHTk_zSe3HVGKVvnWswY8wTRJTYUK5ZJAAQ|| '');
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY|| '');
 
 // === KONFIGURASI ID ===
 const GUILD_ID = '946243184609091625';
