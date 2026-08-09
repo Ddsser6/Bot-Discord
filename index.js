@@ -23,7 +23,7 @@ const client = new Client({
   partials: [Partials.Message, Partials.Channel, Partials.Reaction]
 });
 
-// 2. Inisialisasi Player Musik (DisTube Aman & Stabil)
+// 2. Inisialisasi Player Musik DisTube
 const distube = new DisTube(client, {
   emitNewSongOnly: true,
   ffmpeg: {
@@ -68,14 +68,9 @@ distube.on('error', (channel, e) => {
   }
 });
 
-// --- PENANGANAN UNCAUGHT ERROR (Mencegah Bot Crash di Railway) ---
-process.on('unhandledRejection', error => {
-  console.error('Unhandled promise rejection:', error);
-});
-
-process.on('uncaughtException', error => {
-  console.error('Uncaught exception:', error);
-});
+// Penanganan Uncaught Error
+process.on('unhandledRejection', error => console.error('Unhandled Promise Rejection:', error));
+process.on('uncaughtException', error => console.error('Uncaught Exception:', error));
 
 // --- EVENT HANDLER PESAN ---
 client.on('messageCreate', async (message) => {
@@ -106,7 +101,7 @@ client.on('messageCreate', async (message) => {
   const args = message.content.slice(PREFIX.length).trim().split(/ +/);
   const command = args.shift().toLowerCase();
 
-  // FITUR 3: AI CHAT (Gemini 2.5 Flash + Google Search Grounding)
+  // FITUR 3: AI CHAT (Gemini 2.5 Flash)
   if (command === 'plaza') {
     const prompt = args.join(' ');
     if (!prompt) return message.reply('Masukkan pertanyaan! Contoh: `!PLAZA siapa presiden indonesia sekarang`');
@@ -165,10 +160,11 @@ client.on('messageCreate', async (message) => {
   else if (command === 'play' || command === 'p') {
     const query = args.join(' ');
     if (!query) return message.reply('Masukkan judul lagu, link YouTube, atau link Spotify!');
-    if (!message.member.voice.channel) return message.reply('❌ Kamu harus bergabung ke channel Voice terlebih dahulu!');
+    const voiceChannel = message.member.voice.channel;
+    if (!voiceChannel) return message.reply('❌ Kamu harus bergabung ke channel Voice terlebih dahulu!');
 
     try {
-      await distube.play(message.member.voice.channel, query, {
+      await distube.play(voiceChannel, query, {
         textChannel: message.channel,
         member: message.member
       });
